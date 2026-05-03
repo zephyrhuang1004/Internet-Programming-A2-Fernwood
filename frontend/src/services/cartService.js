@@ -1,10 +1,14 @@
 /**
  * Person 3 (Cart) — backend stubs throw 501.
  * Frontend keeps a local-cart fallback in localStorage until backend lands.
+ *
+ * The shape returned here mirrors `MOCK_CART` in `mock/seed.js` — that file
+ * is the authoritative contract. Backend response MUST match it.
  */
 import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "./apiClient";
 
 const LS_KEY = "fernwood::cart::v1";
+const LOCAL_USER_ID = "u_demo_customer";
 
 const loadLocal = () => {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}").items || []; }
@@ -13,6 +17,11 @@ const loadLocal = () => {
 const saveLocal = (items) => {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ items })); } catch {/* ignore */}
 };
+const cartOf = (items) => ({
+  _id: LOCAL_USER_ID,
+  items,
+  updated_at: new Date().toISOString(),
+});
 
 async function tryRemote(fn, fallback) {
   try { return await fn(); }
@@ -22,7 +31,7 @@ async function tryRemote(fn, fallback) {
 export async function getCart() {
   return tryRemote(
     () => apiGet("/cart"),
-    () => ({ items: loadLocal() }),
+    () => cartOf(loadLocal()),
   );
 }
 
@@ -35,7 +44,7 @@ export async function addItem(productId, qty = 1) {
       if (line) line.qty += qty;
       else items.push({ product_id: productId, qty });
       saveLocal(items);
-      return { items };
+      return cartOf(items);
     },
   );
 }
@@ -51,7 +60,7 @@ export async function updateQty(productId, qty) {
         if (line) line.qty = qty;
       }
       saveLocal(items);
-      return { items };
+      return cartOf(items);
     },
   );
 }
@@ -62,7 +71,7 @@ export async function removeItem(productId) {
     () => {
       const items = loadLocal().filter((i) => i.product_id !== productId);
       saveLocal(items);
-      return { items };
+      return cartOf(items);
     },
   );
 }
@@ -70,6 +79,6 @@ export async function removeItem(productId) {
 export async function clearCart() {
   return tryRemote(
     () => apiDelete("/cart"),
-    () => { saveLocal([]); return { items: [] }; },
+    () => { saveLocal([]); return cartOf([]); },
   );
 }
