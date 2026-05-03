@@ -15,7 +15,26 @@ A warm-organic furniture e-commerce built as a **Vite + React** SPA with a **Fas
 
 ## Local Development
 
-### Backend
+### 1. Configure environment
+
+```bash
+cp .env.example backend/.env
+# then edit backend/.env — see Environment Variables below
+```
+
+You only need to fill in two values:
+
+```bash
+# from MongoDB Atlas → Cluster → Connect → Drivers (Python)
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?appName=fernwood-dev
+
+# generate one with: openssl rand -hex 32
+JWT_SECRET=<paste-the-64-hex-string>
+```
+
+The other variables have safe defaults — leave them as-is.
+
+### 2. Backend
 
 ```bash
 cd backend
@@ -25,9 +44,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Health check: <http://localhost:8000/api/health>
+Health check: <http://localhost:8000/api/health> · Swagger: <http://localhost:8000/docs>
 
-### Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -36,6 +55,23 @@ npm run dev     # http://localhost:5173
 ```
 
 Vite proxies `/api` → `http://localhost:8000` so the SPA can call the backend with same-origin cookies.
+
+---
+
+## Environment Variables
+
+All backend env vars live in `backend/.env` (gitignored). Copy from `.env.example` at the project root.
+
+| Variable           | Required | Default                     | What it does |
+|--------------------|----------|-----------------------------|--------------|
+| `MONGODB_URI`      | ✅ yes   | —                           | MongoDB Atlas connection string. Get it from Atlas → Cluster → **Connect** → **Drivers** → Python. URL-encode any special characters in the password (`@` → `%40`, etc). |
+| `DB_NAME`          | no       | `ip-a2-e-commerce`          | Database name inside the Atlas cluster. Beanie creates collections under this DB. Change only if your team wants per-developer isolated databases. |
+| `JWT_SECRET`       | ✅ yes   | —                           | HMAC secret used to sign access tokens. **Treat as a password — leak = full account takeover.** Generate with `openssl rand -hex 32`. Use a different value per environment (dev / production). |
+| `JWT_ALG`          | no       | `HS256`                     | JWT signing algorithm. Don't change unless you know what you're doing. |
+| `ACCESS_TTL_MIN`   | no       | `30`                        | Access token lifetime in minutes. Frontend auto-refreshes via the refresh cookie when it expires. 30 min is a sensible default. |
+| `REFRESH_TTL_DAYS` | no       | `30`                        | Refresh token (httpOnly cookie) lifetime in days. After this, the user has to re-enter their credentials. |
+| `ENV`              | no       | `dev`                       | Environment marker. When `dev`, the refresh cookie is sent without `Secure` so it works on `http://localhost`. Set to `production` when deploying behind HTTPS. |
+| `CORS_ORIGINS`     | no       | `http://localhost:5173`     | Comma-separated whitelist of front-end origins allowed to call the API. Add your deployment URL here when shipping. |
 
 ## Demo Credentials
 
