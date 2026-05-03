@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     )
 
     MONGODB_URI: str
-    DB_NAME: str = "ip-a2-e-commerce"
+    DB_NAME: str = "fernwood"
     JWT_SECRET: str
     JWT_ALG: str = "HS256"
     ACCESS_TTL_MIN: int = 30
