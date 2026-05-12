@@ -20,4 +20,5 @@ export const I = {
   people: (p) => <svg {...base} width="14" height="14" {...p}><circle cx="7" cy="7" r="2.5"/><circle cx="14" cy="8" r="2"/><path d="M2 16c.5-2.5 2.5-4 5-4s4.5 1.5 5 4M11 15c.5-1.8 2-3 3.5-3s3 1 3.5 3"/></svg>,
   chart: (p) => <svg {...base} width="14" height="14" {...p}><path d="M3 17V3m0 14h14M7 13v-3m4 3V7m4 6v-4"/></svg>,
   activity: (p) => <svg {...base} width="14" height="14" {...p}><path d="M3 10h3l2-5 4 10 2-5h3"/></svg>,
+  edit: (p) => <svg {...base} width="14" height="14" {...p}><path d="M4 16l3-1 8-8-2-2-8 8-1 3Z"/><path d="m13 5 2 2"/></svg>,
 };

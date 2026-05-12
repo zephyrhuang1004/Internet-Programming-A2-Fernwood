@@ -154,7 +154,7 @@ The scaffold ships with **Auth foundation fully wired**, every page UI built, an
 | 2      | Catalogue                   | `pages/{Products,ProductDetail,Home}Page.jsx`, `services/productService.js`                             | `routes/products.py`, `controllers/product_controller.py`, `models/product.py` |
 | 3      | Cart                        | `pages/CartPage.jsx`, `components/CartDrawer.jsx`, `context/CartContext.jsx`, `services/cartService.js` | `routes/cart.py`, `controllers/cart_controller.py`, `models/cart.py`           |
 | 4      | Checkout & Orders           | `pages/{Checkout,Orders,OrderDetail}Page.jsx`, `services/orderService.js`                               | `routes/orders.py`, `controllers/order_controller.py`, `models/order.py`       |
-| 5      | Admin                       | `pages/AdminDashboard.jsx`                                                                              | `routes/admin.py`, `controllers/admin_controller.py`, `models/activity_log.py` |
+| 5      | Admin                       | `pages/admin/*`, `components/admin/*`, `components/charts/*`, `services/adminService.js`, `lib/img.js`, `assets/world.svg` | `routes/admin.py`, `controllers/admin_controller.py`, `models/activity_log.py`, `models/user.py` (added `deleted_at`), `backend/uploads/` |
 
 
 > **Auth foundation (login / register / logout / refresh / me / update profile / list sessions) is already wired** so every other slice can develop end-to-end without waiting on Person 1. Person 1's task is the four account-recovery features bolted on top.
@@ -255,62 +255,73 @@ Suggested model additions on `User`: `reset_token_hash: str | None`, `reset_toke
 
 ### Person 5 — Admin Console (heaviest slice — backend + frontend)
 
-#### Backend stubs
+#### Backend endpoints
 
 
-| Endpoint                            | Controller stub                       | What it returns                                                                            |
-| ----------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `GET /api/admin/dashboard`          | `kpi_dashboard()`                     | Today's order count, this week's revenue, low-stock count (`stock < 5`), 30-day active users. |
-| `GET /api/admin/users?q=`           | `list_users(query)`                   | Paginated users with optional name/email search.                                           |
-| `PATCH /api/admin/users/{id}/role`  | `update_user_role(user_id, role)`     | Set role to `"admin"` or `"customer"`. Reject any other value.                             |
-| `DELETE /api/admin/users/{id}`      | `delete_user(user_id)`                | Soft-delete (`deleted_at`). **Cannot delete admins** (403). Cascade-delete the user's cart. |
-| `GET /api/admin/orders?...`         | `list_orders(filters)`                | Filter by status / date range; newest first.                                               |
-| `GET /api/admin/activity?action=`   | `list_activity(filters)`              | Audit log with optional action filter.                                                     |
-| `GET /api/admin/analytics`          | `analytics_overview()`                | 30-day revenue per day; breakdowns by status / category / country (Mongo aggregation).     |
+| Endpoint                                  | Controller                              | What it returns                                                                            |
+| ----------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /api/admin/dashboard`                | `kpi_dashboard()`                       | Today's order count, this week's revenue, low-stock count (`stock < 5`), 30-day active users. |
+| `GET /api/admin/users?q=`                 | `list_users(query)`                     | Users with optional name/email regex search, soft-deleted hidden, newest first.            |
+| `PATCH /api/admin/users/{id}/role`        | `update_user_role(user_id, role)`       | Set role to `"admin"` or `"customer"`. Reject any other value (400).                       |
+| `DELETE /api/admin/users/{id}`            | `delete_user(user_id)`                  | Soft-delete (`deleted_at`). **Cannot delete admins** (403). Cascade-delete the user's cart. |
+| `GET /api/admin/users/{id}/cart`          | `get_user_cart(user_id)`                | **Spec requirement**: admin can view any user's shopping cart, hydrated with product names/images and line totals. |
+| `GET /api/admin/products?q=`              | `list_admin_products(query)`            | All products including soft-deleted (so admin can manage retired SKUs). |
+| `POST /api/admin/products`                | `admin_create_product(payload)`         | Create a new product. Writes ActivityLog. |
+| `PATCH /api/admin/products/{id}`          | `admin_update_product(id, payload)`     | Update a product with **optimistic-lock** on `version` — payload must include version, 400 if missing, 409 on mismatch. |
+| `DELETE /api/admin/products/{id}`         | `admin_delete_product(id)`              | Soft-delete by setting `deleted_at`. |
+| `PATCH /api/admin/products/{id}/restore`  | `admin_restore_product(id)`             | Undo soft-delete (clears `deleted_at`, bumps version). |
+| `GET /api/admin/orders?...`               | `list_orders(filters)`                  | Filter by status / date range; newest first.                                               |
+| `PATCH /api/admin/orders/{id}/status`     | `admin_update_status(id, status)`       | State machine `Processing → Shipped → Delivered`; rejects illegal transitions (400). Shared with Person 4. |
+| `GET /api/admin/activity?action=`         | `list_activity(filters)`                | Audit log with optional action filter, newest first.                                       |
+| `GET /api/admin/analytics`                | `analytics_overview()`                  | 30-day revenue per day; breakdowns by status / category / country (4 Mongo aggregations run in parallel). |
+| `POST /api/admin/uploads`                 | (inline in `routes/admin.py`)           | Product image upload — multipart, ≤ 5 MB, JPEG/PNG/WebP only, stores `<uuid>.<ext>` under `backend/uploads/`. |
+| `GET /api/admin/uploads/{filename}`       | (inline in `routes/admin.py`)           | Public read for uploaded images (FileResponse). Strict UUID-pattern filename to block path traversal. |
 
 
-> `admin_update_status` for orders lives in `order_controller.py` and is shared with Person 4.
+All admin mutations write an `ActivityLog` entry for audit trail.
 
-#### Frontend — split `AdminDashboard.jsx` into 6 tab components
-
-The current `AdminDashboard.jsx` is a 52-line tab shell with `{tab} — TODO` placeholders. Build out 6 sections — recommended layout (one component per tab, target < 300 lines each):
+#### Frontend — `pages/admin/` directory
 
 ```
 src/pages/admin/
-  AdminDashboardLayout.jsx     ← refactor of existing shell, owns tab routing
-  DashboardTab.jsx             ← KPI cards (today / week / low stock / active users)
-  ProductsTab.jsx              ← product list + create/edit modal + image upload + soft delete
-  UsersTab.jsx                 ← user list + role toggle + delete (block admins)
-  OrdersTab.jsx                ← order list + status filter + status transition button
-  ActivityTab.jsx              ← audit log table with action filter
-  AnalyticsTab.jsx             ← revenue chart + breakdowns
+  AdminLayout.jsx              ← sidebar + nested-route shell under /admin/*
+  DashboardTab.jsx             ← KPI cards (today / week / low stock / active users) + recent activity + premium pieces
+  ProductsTab.jsx              ← product list + create/edit modal + image upload + soft delete + Active/Retired toggle + restore
+  UsersTab.jsx                 ← user list (expandable card) + role editor + cart inspection panel
+  OrdersTab.jsx                ← order list + status filter chips + advance button + click-row detail modal
+  ActivityTab.jsx              ← audit log table with action filter chips
+  AnalyticsTab.jsx             ← KPI + revenue trend + by-status + by-category + world map
 ```
 
 
-| Tab           | UI elements                                                                                              | API used                                     |
-| ------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Dashboard** | 4 KPI cards (today / week / low stock / active users), each with number + label + icon. Optional sparkline. | `GET /api/admin/dashboard`                  |
-| **Products**  | Table: img / name / category / price / stock / version / actions. "New product" button → modal form. Edit modal pre-fills. Delete with confirm. | `GET /api/products`, `POST/PATCH/DELETE /api/admin/products[/:id]` |
-| **Users**     | Table: name / email / role / joined / actions. Role dropdown. Delete button disabled for admins. Search box. | `GET /api/admin/users?q=`, `PATCH .../role`, `DELETE .../{id}` |
-| **Orders**    | Table: order id / customer / total / status pill / date / action. Filter chips: All / Processing / Shipped / Delivered. Status transition cycles to next state. | `GET /api/admin/orders?status=&date_from=&date_to=`, `PATCH .../status` |
-| **Activity**  | Audit log table: timestamp / actor / action / target. Action filter dropdown.                            | `GET /api/admin/activity?action=`           |
-| **Analytics** | Line chart: revenue per day (30 days). Stacked bar: orders by status. Pie/bar: orders by category. Country breakdown. | `GET /api/admin/analytics`                  |
+| Tab           | UI elements                                                                                                                                  | API used                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Dashboard** | 4 KPI cards (today / week / low stock / active users) + recent activity feed + premium products grid.                                        | `GET /api/admin/dashboard`, `GET /api/admin/activity`, `GET /api/admin/products`     |
+| **Products**  | Table: img / name / category / material / price / stock / actions. Active/Retired chip toggle. "New product" + file-upload editor modal. Edit modal pre-fills + version-aware optimistic-lock. Soft delete + restore. | `GET/POST/PATCH/DELETE /api/admin/products`, `POST /api/admin/uploads`               |
+| **Users**     | Expandable card per user: avatar + name + email + role badge. Expanding reveals user id, Edit role / Delete, and the user's hydrated shopping cart. Search by name/email with match highlighting. | `GET /api/admin/users?q=`, `PATCH .../role`, `DELETE .../{id}`, `GET .../{id}/cart` |
+| **Orders**    | Table: order id / customer / placed / items / total / status pill / advance action. Filter chips. Click row to open Order Detail modal showing customer, shipping address, masked payment, item snapshots, and the subtotal+shipping+tax=total breakdown. | `GET /api/admin/orders?status=`, `PATCH .../status`                                  |
+| **Activity**  | Audit log table: timestamp / action / detail / actor. Action filter chips.                                                                   | `GET /api/admin/activity?action=`                                                    |
+| **Analytics** | KPI row (revenue / last 7 days / AOV / daily revenue sparkline) + area chart (revenue trend) + horizontal bars (by status, top categories) + world map (orders by country, real 256-country SVG).| `GET /api/admin/analytics`                                                            |
 
 
-**Reusable components to extract**
-- `<KpiCard label icon value sub />` — used 4× in Dashboard.
-- `<DataTable columns rows />` — used in Products / Users / Orders / Activity.
-- `<StatusPill status />` — order status with color (Processing=amber, Shipped=blue, Delivered=green).
-- `<ConfirmDialog />` — for destructive actions.
+**Reusable components**
+- `components/admin/KpiCard.jsx` — used 4× on Dashboard and 4× on Analytics.
+- `components/admin/StatusBadge.jsx` — order status with semantic color (Processing=amber, Shipped=clay, Delivered=moss).
+- `components/admin/ConfirmDialog.jsx` — destructive action confirmation.
+- `components/admin/Modal.jsx` — base dialog (wide variant for editors).
+- `components/admin/OrderDetailModal.jsx` — read-only inspection of one order.
+- `components/charts/{AreaChart,HBar,Sparkline,WorldMap}.jsx` — hand-rolled SVG, no chart library.
+- `lib/img.js` — `imgUrl()` resolver handling three sources (full URL, backend `/api/...` upload path, bare Unsplash photo ID).
 
-**`services/adminService.js`** is already wired for every endpoint. Add mock fallback the same way `productService.js` does — wrap each call in `try { real } catch (e) { if (e.isStub) return MOCK_X }`.
+**`services/adminService.js`** wraps every admin endpoint with a mock fallback (`tryRemote(remote, fallback)`) so the console keeps working when the backend is stubbed.
 
 **Acceptance criteria**
-- Dashboard renders without errors when backend is fully implemented.
-- Cannot delete an admin user (UI disabled + backend 403).
-- Order status transitions enforce the state machine.
-- All tables paginate or virtualize gracefully past 100 rows.
-- Analytics renders even when backend is stubbed (mock data).
+- Dashboard, Analytics, Products, Users, Orders, Activity all render without errors against the live backend.
+- Cannot delete an admin user (UI hides Delete + backend returns 403).
+- Order status transitions enforce the Processing → Shipped → Delivered state machine; illegal jumps return 400.
+- Product edits use optimistic-lock — missing or stale `version` returns 400/409.
+- Admin can view any user's shopping cart (spec requirement).
+- Analytics renders even when the backend stub returns 501 (mock fallback).
 
 
 ---
