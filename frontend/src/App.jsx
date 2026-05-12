@@ -20,7 +20,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import OrdersPage from "./pages/OrdersPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
 import OrderConfirmPage from "./pages/OrderConfirmPage";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminLayout from "./pages/admin/AdminLayout";
 
 export default function App() {
   const [cartOpen, setCartOpen] = useState(false);
@@ -43,7 +43,7 @@ export default function App() {
           <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
           <Route path="/orders/:id" element={<RequireAuth><OrderDetailPage /></RequireAuth>} />
           <Route path="/order-confirm/:id" element={<RequireAuth><OrderConfirmPage /></RequireAuth>} />
-          <Route path="/admin/*" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
+          <Route path="/admin/*" element={<RequireAdmin><AdminLayout /></RequireAdmin>} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </div>

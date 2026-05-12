@@ -11,6 +11,7 @@ import {
   MOCK_ACTIVITY,
   MOCK_ANALYTICS,
   MOCK_PRODUCTS,
+  MOCK_CART,
 } from "../mock/seed";
 
 const stub = (e) => e instanceof ApiError && e.isStub;
@@ -22,6 +23,54 @@ async function tryRemote(fn, fallback) {
 
 // ----- Dashboard -----
 export const dashboard = () => tryRemote(() => apiGet("/admin/dashboard"), MOCK_KPI);
+
+// ----- Products list (admin sees soft-deleted too) -----
+export const listAdminProducts = (q) =>
+  tryRemote(
+    () => apiGet(`/admin/products${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+    () => {
+      if (!q) return MOCK_PRODUCTS;
+      const ql = q.toLowerCase();
+      return MOCK_PRODUCTS.filter(
+        (p) =>
+          p.name.toLowerCase().includes(ql) ||
+          p.category.toLowerCase().includes(ql) ||
+          (p.material || "").toLowerCase().includes(ql),
+      );
+    },
+  );
+
+// ----- User cart (admin inspection) -----
+export const getUserCart = (userId) =>
+  tryRemote(
+    () => apiGet(`/admin/users/${encodeURIComponent(userId)}/cart`),
+    () => {
+      // Hydrate MOCK_CART items with product details to mimic backend shape.
+      const items = MOCK_CART.items.map((it) => {
+        const p = MOCK_PRODUCTS.find((x) => x._id === it.product_id);
+        const unit_price = it.unit_price ?? (p?.price ?? 0);
+        return {
+          product_id: it.product_id,
+          qty: it.qty,
+          unit_price,
+          line_total: unit_price * it.qty,
+          name: p?.name ?? "(product removed)",
+          img: p?.img ?? "",
+          category: p?.category ?? "",
+          product_deleted: false,
+        };
+      });
+      const subtotal = items.reduce((s, l) => s + l.line_total, 0);
+      return {
+        _id: userId,
+        user_name: "(mock)",
+        user_email: "(mock)",
+        items,
+        subtotal,
+        updated_at: MOCK_CART.updated_at,
+      };
+    },
+  );
 
 // ----- Users -----
 export const listUsers = (q) =>
@@ -77,6 +126,15 @@ export const deleteProduct = (id) =>
   tryRemote(
     () => apiDelete(`/admin/products/${id}`),
     () => ({ ok: true, _id: id, deleted_at: new Date().toISOString() }),
+  );
+
+export const restoreProduct = (id) =>
+  tryRemote(
+    () => apiPatch(`/admin/products/${id}/restore`, {}),
+    () => {
+      const existing = MOCK_PRODUCTS.find((x) => x._id === id);
+      return existing ? { ...existing, deleted_at: null } : null;
+    },
   );
 
 // ----- Orders -----
