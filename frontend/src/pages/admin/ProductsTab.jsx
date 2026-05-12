@@ -5,6 +5,7 @@ import {
   updateProduct,
   deleteProduct,
   restoreProduct,
+  uploadProductImage,
 } from "../../services/adminService";
 import { SearchBox } from "../../components/SearchBox";
 import { EmptyState } from "../../components/EmptyState";
@@ -12,16 +13,12 @@ import { Modal } from "../../components/admin/Modal";
 import { ConfirmDialog } from "../../components/admin/ConfirmDialog";
 import { I } from "../../components/Icons";
 import { fmtMoney, highlight } from "../../lib/format";
+import { imgUrl } from "../../lib/img";
 
 const CATEGORIES = ["Seating", "Tables", "Storage", "Lighting", "Bedroom", "Rugs & Textiles"];
 const MATERIALS = ["Solid oak", "Walnut", "Linen", "Wool", "Bouclé", "Brass", "Leather"];
 const PALETTES = ["Sand", "Oat", "Clay", "Honey", "Moss", "Brass", "Bone"];
 
-function imgUrl(id, size = 240) {
-  if (!id) return "";
-  if (id.startsWith("http")) return id;
-  return `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${size}&q=70`;
-}
 
 const EMPTY_FORM = {
   name: "",
@@ -287,6 +284,24 @@ function ProductEditor({ open, product, onClose, onSave, busy }) {
   const isNew = !product;
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const { url } = await uploadProductImage(file);
+      setForm((f) => ({ ...f, img: url }));
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // allow re-selecting same file
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -342,7 +357,28 @@ function ProductEditor({ open, product, onClose, onSave, busy }) {
               <img src={imgUrl(form.img, 600)} alt="" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: "var(--r-md)" }} />
             )}
             <div className="field" style={{ marginTop: 10 }}>
-              <label>Unsplash photo ID</label>
+              <label>Image</label>
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <label className="btn ghost xs" style={{ cursor: uploading ? "wait" : "pointer" }}>
+                  <I.plus /> {uploading ? "Uploading…" : "Upload"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleUpload}
+                    disabled={uploading}
+                    style={{ display: "none" }}
+                  />
+                </label>
+                {form.img && (
+                  <button type="button" className="btn ghost xs danger" onClick={() => set("img", "")}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              {uploadError && <p className="err" style={{ marginTop: 6 }}>{uploadError}</p>}
+            </div>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label>Or paste a URL / Unsplash photo ID</label>
               <input className="input mono" value={form.img} onChange={(e) => set("img", e.target.value)} />
             </div>
           </div>

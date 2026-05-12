@@ -1,14 +1,36 @@
-from fastapi import APIRouter, Depends, Query
+import re
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from controllers import admin_controller as adc
 from controllers import order_controller as oc
 from controllers import product_controller as pc
 from middleware.auth_middleware import require_admin
+from models.activity_log import ActivityLog
 from models.user import User
 
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Upload constraints
+# ---------------------------------------------------------------------------
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+ALLOWED_MIME = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+# UUID v4 + image ext — rejects anything with `..`, `/`, etc.
+SAFE_FILENAME = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$")
 
 
 class RoleIn(BaseModel):
@@ -96,3 +118,51 @@ async def activity(action: str | None = Query(default=None), _: User = Depends(r
 @router.get("/analytics")
 async def analytics(_: User = Depends(require_admin)):
     return {"success": True, "data": await adc.analytics_overview(), "error": None}
+
+
+# ----- File uploads (product images) -----
+@router.post("/uploads")
+async def upload_image(file: UploadFile = File(...), actor: User = Depends(require_admin)):
+    """Accept a single image file, store it under backend/uploads/<uuid>.<ext>,
+    return a URL the front end can stuff into product.img.
+    """
+    ext = ALLOWED_MIME.get(file.content_type or "")
+    if ext is None:
+        raise HTTPException(status_code=415, detail=f"Unsupported media type: {file.content_type}")
+
+    # Read once; bail out if too large.
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_BYTES // 1024 // 1024} MB limit")
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty upload")
+
+    filename = f"{uuid.uuid4()}{ext}"
+    target = UPLOAD_DIR / filename
+    with open(target, "wb") as f:
+        f.write(data)
+
+    await ActivityLog(
+        user_id=actor.id,
+        action="product.image_uploaded",
+        detail=f"{filename} ({len(data) // 1024} KB)",
+    ).insert()
+
+    return {
+        "success": True,
+        "data": {"url": f"/api/admin/uploads/{filename}", "size": len(data)},
+        "error": None,
+    }
+
+
+@router.get("/uploads/{filename}")
+async def serve_upload(filename: str):
+    """Public read of an admin-uploaded image — customers see catalogue too.
+    Filename pattern is strictly validated to block path traversal.
+    """
+    if not SAFE_FILENAME.match(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    path = UPLOAD_DIR / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)

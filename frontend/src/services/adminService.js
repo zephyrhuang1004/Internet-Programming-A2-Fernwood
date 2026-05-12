@@ -3,7 +3,7 @@
  * Each call falls back to mock fixtures from `mock/seed.js` so the admin
  * console is fully clickable before the controllers are implemented.
  */
-import { apiGet, apiPatch, apiPost, apiDelete, ApiError } from "./apiClient";
+import { apiGet, apiPatch, apiPost, apiDelete, ApiError, getAccessToken } from "./apiClient";
 import {
   MOCK_KPI,
   MOCK_ADMIN_USERS,
@@ -105,6 +105,27 @@ export const deleteUser = (id) =>
       return { ok: true };
     },
   );
+
+// ----- Product image upload (multipart) -----
+// Bypasses tryRemote / apiClient because multipart bodies need the browser
+// to set Content-Type with its own boundary string.
+export async function uploadProductImage(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const token = getAccessToken();
+  const res = await fetch("/api/admin/uploads", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+    credentials: "include",
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch { /* non-JSON error body */ }
+  if (!res.ok) {
+    throw new ApiError(payload?.error || res.statusText || "Upload failed", res.status, false);
+  }
+  return payload?.data ?? payload; // { url, size }
+}
 
 // ----- Products (admin CRUD) -----
 export const createProduct = (p) =>

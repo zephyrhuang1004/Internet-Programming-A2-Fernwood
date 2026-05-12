@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { dashboard, listActivity, listAdminProducts } from "../../services/adminService";
 import { fmtMoneyShort, fmtDateTime } from "../../lib/format";
+import { imgUrl } from "../../lib/img";
 import { KpiCard } from "../../components/admin/KpiCard";
 import { I } from "../../components/Icons";
 
@@ -15,12 +16,6 @@ const ACTION_BADGE = {
   "order.status_changed": "clay",
   "auth.login": "moss",
 };
-
-function imgUrl(id, size = 200) {
-  if (!id) return "";
-  if (id.startsWith("http")) return id;
-  return `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${size}&q=70`;
-}
 
 export default function DashboardTab() {
   const [kpi, setKpi] = useState(null);

@@ -6,12 +6,7 @@ import { ConfirmDialog } from "../../components/admin/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { I } from "../../components/Icons";
 import { fmtDate, fmtDateTime, fmtMoney, initials, highlight } from "../../lib/format";
-
-function imgUrl(id, size = 120) {
-  if (!id) return "";
-  if (id.startsWith("http")) return id;
-  return `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${size}&q=70`;
-}
+import { imgUrl } from "../../lib/img";
 
 export default function UsersTab() {
   const [users, setUsers] = useState([]);
