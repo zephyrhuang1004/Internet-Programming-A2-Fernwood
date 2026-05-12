@@ -31,29 +31,44 @@ async def users(q: str | None = Query(default=None), _: User = Depends(require_a
 
 
 @router.patch("/users/{user_id}/role")
-async def set_role(user_id: str, body: RoleIn, _: User = Depends(require_admin)):
-    return {"success": True, "data": await adc.update_user_role(user_id, body.role), "error": None}
+async def set_role(user_id: str, body: RoleIn, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await adc.update_user_role(user_id, body.role, actor=actor), "error": None}
 
 
 @router.delete("/users/{user_id}")
-async def del_user(user_id: str, _: User = Depends(require_admin)):
-    return {"success": True, "data": await adc.delete_user(user_id), "error": None}
+async def del_user(user_id: str, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await adc.delete_user(user_id, actor=actor), "error": None}
+
+
+@router.get("/users/{user_id}/cart")
+async def user_cart(user_id: str, _: User = Depends(require_admin)):
+    return {"success": True, "data": await adc.get_user_cart(user_id), "error": None}
 
 
 # ----- Products -----
+@router.get("/products")
+async def list_admin_products(q: str | None = Query(default=None), _: User = Depends(require_admin)):
+    return {"success": True, "data": await adc.list_admin_products(q), "error": None}
+
+
 @router.post("/products")
-async def create_product(payload: dict, _: User = Depends(require_admin)):
-    return {"success": True, "data": await pc.admin_create_product(payload), "error": None}
+async def create_product(payload: dict, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await pc.admin_create_product(payload, actor=actor), "error": None}
 
 
 @router.patch("/products/{product_id}")
-async def update_product(product_id: str, payload: dict, _: User = Depends(require_admin)):
-    return {"success": True, "data": await pc.admin_update_product(product_id, payload), "error": None}
+async def update_product(product_id: str, payload: dict, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await pc.admin_update_product(product_id, payload, actor=actor), "error": None}
 
 
 @router.delete("/products/{product_id}")
-async def delete_product(product_id: str, _: User = Depends(require_admin)):
-    return {"success": True, "data": await pc.admin_delete_product(product_id), "error": None}
+async def delete_product(product_id: str, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await pc.admin_delete_product(product_id, actor=actor), "error": None}
+
+
+@router.patch("/products/{product_id}/restore")
+async def restore_product(product_id: str, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await pc.admin_restore_product(product_id, actor=actor), "error": None}
 
 
 # ----- Orders -----
@@ -68,8 +83,8 @@ async def list_orders(
 
 
 @router.patch("/orders/{order_id}/status")
-async def order_status(order_id: str, body: StatusIn, _: User = Depends(require_admin)):
-    return {"success": True, "data": await oc.admin_update_status(order_id, body.status), "error": None}
+async def order_status(order_id: str, body: StatusIn, actor: User = Depends(require_admin)):
+    return {"success": True, "data": await oc.admin_update_status(order_id, body.status, actor=actor), "error": None}
 
 
 # ----- Activity / Analytics -----
