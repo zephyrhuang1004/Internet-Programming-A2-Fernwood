@@ -172,14 +172,13 @@ export default function ProductsTab() {
                 <th>Material</th>
                 <th className="num">Price</th>
                 <th className="num">Stock</th>
-                <th className="num" style={{ width: 60 }} title="Optimistic-lock version, bumps on every edit">Ver</th>
                 <th style={{ width: 110 }}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: 40 }}>
+                  <td colSpan="7" style={{ padding: 40 }}>
                     <EmptyState
                       icon={<I.box />}
                       title={showRetired ? "Nothing retired" : "No products match"}
@@ -217,9 +216,6 @@ export default function ProductsTab() {
                       ) : (
                         <span className="stock-cell">{p.stock}</span>
                       )}
-                    </td>
-                    <td className="num mono muted" style={{ fontSize: 11.5 }}>
-                      v{p.version ?? 0}
                     </td>
                     <td>
                       <div className="row" style={{ gap: 4, justifyContent: "flex-end" }}>
@@ -326,7 +322,12 @@ function ProductEditor({ open, product, onClose, onSave, busy }) {
     <Modal open={open} onClose={onClose} wide>
       <div className="row between" style={{ alignItems: "flex-start" }}>
         <div>
-          <div className="mono muted">{isNew ? "CREATE" : "EDIT"}</div>
+          <div className="mono muted">
+            {isNew ? "CREATE" : "EDIT"}
+            {!isNew && product && (
+              <span title="Optimistic-lock version, bumps on every save"> · v{product.version ?? 0}</span>
+            )}
+          </div>
           <h3 style={{ fontFamily: "var(--f-display)", fontSize: 24, marginTop: 2 }}>
             {isNew ? "New product" : form.name || "Untitled"}
           </h3>
