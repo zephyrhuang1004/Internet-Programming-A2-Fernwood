@@ -12,7 +12,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { Modal } from "../../components/admin/Modal";
 import { ConfirmDialog } from "../../components/admin/ConfirmDialog";
 import { I } from "../../components/Icons";
-import { fmtMoney, highlight } from "../../lib/format";
+import { fmtMoney, fmtDate, highlight } from "../../lib/format";
 import { imgUrl } from "../../lib/img";
 
 const CATEGORIES = ["Seating", "Tables", "Storage", "Lighting", "Bedroom", "Rugs & Textiles"];
@@ -340,7 +340,12 @@ function ProductEditor({ open, product, onClose, onSave, busy }) {
           <div className="mono muted">
             {isNew ? "CREATE" : "EDIT"}
             {!isNew && product && (
-              <span title="Optimistic-lock version, bumps on every save"> · v{product.version ?? 0}</span>
+              <>
+                <span title="Optimistic-lock version, bumps on every save"> · v{product.version ?? 0}</span>
+                {product.created_at && (
+                  <span> · Added {fmtDate(product.created_at)}</span>
+                )}
+              </>
             )}
           </div>
           <h3 style={{ fontFamily: "var(--f-display)", fontSize: 24, marginTop: 2 }}>

@@ -46,6 +46,7 @@ def _serialize_product(p: Product) -> dict[str, Any]:
         "palette": p.palette,
         "version": p.version,
         "deleted_at": p.deleted_at.isoformat() if p.deleted_at else None,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
     }
 
 

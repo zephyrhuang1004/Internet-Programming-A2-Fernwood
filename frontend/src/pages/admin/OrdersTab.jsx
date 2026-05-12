@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { listOrders, updateOrderStatus, listUsers } from "../../services/adminService";
+import { listOrders, updateOrderStatus, listUsers, listAdminProducts } from "../../services/adminService";
 import { SearchBox } from "../../components/SearchBox";
 import { EmptyState } from "../../components/EmptyState";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { I } from "../../components/Icons";
 import { fmtMoney, fmtDate, highlight } from "../../lib/format";
+import { OrderDetailModal } from "../../components/admin/OrderDetailModal";
 
 const STATUSES = ["all", "Processing", "Shipped", "Delivered"];
 const NEXT = { Processing: "Shipped", Shipped: "Delivered" };
@@ -12,19 +13,23 @@ const NEXT = { Processing: "Shipped", Shipped: "Delivered" };
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const reload = async () => {
     try {
-      const [o, u] = await Promise.all([
+      const [o, u, p] = await Promise.all([
         listOrders(status === "all" ? {} : { status }),
         listUsers(""),
+        listAdminProducts(""),
       ]);
       setOrders(o || []);
       setUsers(u || []);
+      setProducts(p || []);
       setErr(null);
     } catch (e) {
       setErr(e.message);
@@ -38,6 +43,12 @@ export default function OrdersTab() {
     users.forEach((u) => { m[u._id] = u; });
     return m;
   }, [users]);
+
+  const productIndex = useMemo(() => {
+    const m = {};
+    products.forEach((p) => { m[p._id] = p; });
+    return m;
+  }, [products]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -54,8 +65,10 @@ export default function OrdersTab() {
     if (!next) return;
     setBusy(true);
     try {
-      await updateOrderStatus(o._id, next);
+      const updated = await updateOrderStatus(o._id, next);
       await reload();
+      // Keep modal open with the freshly-advanced order if it's the one we're viewing.
+      if (selectedOrder?._id === o._id && updated) setSelectedOrder(updated);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -93,6 +106,17 @@ export default function OrdersTab() {
         </div>
       </div>
 
+      <OrderDetailModal
+        open={!!selectedOrder}
+        order={selectedOrder}
+        customer={selectedOrder ? userIndex[selectedOrder.user_id] : null}
+        productIndex={productIndex}
+        nextStatus={selectedOrder ? NEXT[selectedOrder.status] : null}
+        busy={busy}
+        onAdvance={() => selectedOrder && advance(selectedOrder)}
+        onClose={() => setSelectedOrder(null)}
+      />
+
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrap">
           <table className="table">
@@ -119,7 +143,11 @@ export default function OrdersTab() {
                   const u = userIndex[o.user_id];
                   const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 0), 0);
                   return (
-                    <tr key={o._id}>
+                    <tr
+                      key={o._id}
+                      onClick={() => setSelectedOrder(o)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <td className="mono">{highlight(o._id, q)}</td>
                       <td>
                         <div>{u?.name ? highlight(u.name, q) : "—"}</div>
@@ -136,7 +164,7 @@ export default function OrdersTab() {
                           <button
                             className="btn ghost xs"
                             disabled={busy}
-                            onClick={() => advance(o)}
+                            onClick={(e) => { e.stopPropagation(); advance(o); }}
                           >
                             → {NEXT[o.status]}
                           </button>
