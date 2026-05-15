@@ -78,10 +78,21 @@ export default function ProductDetailPage() {
 
           <hr className="hr" />
 
+          {/* Stock indicator — only shown when low (≤5) or sold out */}
+          {product.stock === 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <span className="badge rose">Sold out</span>
+            </div>
+          )}
+          {product.stock > 0 && product.stock <= 5 && (
+            <div style={{ marginBottom: 16 }}>
+              <span className="badge amber">Only {product.stock} left</span>
+            </div>
+          )}
+
           <div className="pd-specs">
             <div><span className="mono muted">Material</span><div>{product.material}</div></div>
             <div><span className="mono muted">Palette</span><div>{product.palette}</div></div>
-            <div><span className="mono muted">In stock</span><div className="num">{product.stock} units</div></div>
             <div><span className="mono muted">Ships in</span><div>5–7 days</div></div>
           </div>
 
