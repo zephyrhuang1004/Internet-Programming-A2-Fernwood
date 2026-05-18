@@ -4,6 +4,12 @@
 
 A warm-organic furniture e-commerce built as a **Vite + React** SPA with a **FastAPI + MongoDB (Beanie)** backend.
 
+Fernwood is where people come to find furniture that actually feels like home.
+
+Warm materials, considered design, and pieces built to last, Fernwood brings a curated collection of oak, linen, wool, and brass furniture to people who care about what fills their space.
+Shoppers can browse by category, search for specific pieces, and check out in minutes with a seamless bag and payment flow. Every order is saved to their account so they can track it from workshop to doorstep.
+Behind the scenes, store managers get a full admin dashboard, live sales metrics, inventory control, user management, and order tracking all in one place.
+
 ## Stack
 
 
@@ -14,6 +20,73 @@ A warm-organic furniture e-commerce built as a **Vite + React** SPA with a **Fas
 | Database | MongoDB Atlas                                                                  |
 | Fonts    | Instrument Serif (display), Geist (body), JetBrains Mono (data)                |
 
+## Folder Structure
+
+```
+Internet-Programming-A2-Fernwood/
+├── backend/                        # FastAPI backend
+│   ├── controllers/                # Business logic for each slice
+│   │   ├── auth_controller.py      # Login, register, sessions (Person 1)
+│   │   ├── order_controller.py     # Checkout & orders (Person 4)
+│   │   ├── product_controller.py   # Product catalogue (Person 2)
+│   │   ├── cart_controller.py      # Shopping cart (Person 3)
+│   │   └── admin_controller.py     # Admin dashboard (Person 5)
+│   ├── models/                     # MongoDB document schemas (Beanie)
+│   │   ├── user.py                 # User model (Person 1)
+│   │   ├── order.py                # Order, OrderItem, Payment models (Person 4)
+│   │   ├── product.py              # Product model (Person 2)
+│   │   ├── cart.py                 # Cart model (Person 3)
+│   │   └── activity_log.py         # Admin activity log model (Person 5)
+│   ├── routes/                     # API endpoint definitions (FastAPI routers)
+│   │   ├── auth.py                 # /api/auth/* (Person 1)
+│   │   ├── orders.py               # /api/orders/* (Person 4)
+│   │   ├── products.py             # /api/products/* (Person 2)
+│   │   ├── cart.py                 # /api/cart/* (Person 3)
+│   │   └── admin.py                # /api/admin/* (Person 5)
+│   ├── middleware/                 # Auth middleware (JWT validation) (Person 1)
+│   ├── schemas/                    # Pydantic input/output schemas (Person 1)
+│   ├── database.py                 # MongoDB Atlas connection (Person 5)
+│   ├── constants.py                # TAX_RATE, FREE_SHIP_AT, FLAT_SHIP (Person 5)
+│   ├── config.py                   # App configuration from .env (Person 5)
+│   ├── main.py                     # FastAPI app entry point (Person 5)
+│   ├── seed.py                     # Database seeding script (Person 5)
+│   └── requirements.txt            # Python dependencies
+│
+├── frontend/                       # Vite + React SPA
+│   ├── src/
+│   │   ├── pages/                  # One file per page/route
+│   │   │   ├── HomePage.jsx                # Person 2
+│   │   │   ├── ProductsPage.jsx            # Person 2
+│   │   │   ├── ProductDetailPage.jsx       # Person 2
+│   │   │   ├── CartPage.jsx                # Person 3
+│   │   │   ├── CheckoutPage.jsx            # Person 4
+│   │   │   ├── OrdersPage.jsx              # Person 4
+│   │   │   ├── OrderDetailPage.jsx         # Person 4
+│   │   │   ├── AccountPage.jsx             # Person 1
+│   │   │   └── AdminDashboard.jsx          # Person 5
+│   │   ├── services/               # API call functions (one per slice)
+│   │   │   ├── apiClient.js        # Base fetch wrapper + error handling (Person 5)
+│   │   │   ├── authService.js      # Auth API calls (Person 1)
+│   │   │   ├── orderService.js     # Order API calls (Person 4)
+│   │   │   ├── productService.js   # Product API calls (Person 2)
+│   │   │   ├── cartService.js      # Cart API calls (Person 3)
+│   │   │   └── adminService.js     # Admin API calls (Person 5)
+│   │   ├── context/                # React context providers
+│   │   │   ├── AuthContext.jsx     # Logged-in user state (Person 1)
+│   │   │   ├── CartContext.jsx     # Cart state (Person 3)
+│   │   │   └── ToastContext.jsx    # Toast notifications (Person 5)
+│   │   ├── components/             # Reusable UI components (Person 5)
+│   │   ├── mock/
+│   │   │   └── seed.js             # Mock data + API contract for all slices (Person 5)
+│   │   ├── lib/                    # Utility functions (Person 5)
+│   │   └── constants.js            # Frontend constants (Person 5)
+│   ├── vite.config.js              # Vite config + /api proxy to backend (Person 1)
+│   └── package.json                # Node dependencies
+│
+├── .env.example                    # Environment variable template (Person 5)
+├── .gitignore
+└── README.md
+```
 
 ## Onboarding for Team Members
 
@@ -143,18 +216,20 @@ Workflow: open the contract → look at the shape → write your Beanie query th
 
 ---
 
-## Hand-off Map (Group of 5)
+## Hand-off Map and Workload Allocation (Group of 5)
 
 The scaffold ships with **Auth foundation fully wired**, every page UI built, and every frontend service set up with a mock fallback (HTTP 501 → mock from `seed.js`). All five slices can be developed in parallel — nobody is blocked.
 
 
-| Person | Slice                       | Frontend files                                                                                          | Backend files                                                                  |
-| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 1      | Account Recovery & Sessions | `pages/{ForgotPassword,ResetPassword,Account}Page.jsx`, `services/authService.js`                       | `routes/auth.py`, `controllers/auth_controller.py` (4 stubs at the bottom)     |
-| 2      | Catalogue                   | `pages/{Products,ProductDetail,Home}Page.jsx`, `services/productService.js`                             | `routes/products.py`, `controllers/product_controller.py`, `models/product.py` |
-| 3      | Cart                        | `pages/CartPage.jsx`, `components/CartDrawer.jsx`, `context/CartContext.jsx`, `services/cartService.js` | `routes/cart.py`, `controllers/cart_controller.py`, `models/cart.py`           |
-| 4      | Checkout & Orders           | `pages/{Checkout,Orders,OrderDetail}Page.jsx`, `services/orderService.js`                               | `routes/orders.py`, `controllers/order_controller.py`, `models/order.py`       |
-| 5      | Admin                       | `pages/AdminDashboard.jsx`                                                                              | `routes/admin.py`, `controllers/admin_controller.py`, `models/activity_log.py` |
+## Hand-off Map (Group of 5)
+
+| Person | Team Member | Slice | Frontend files | Backend files |
+|--------|-------------|-------|----------------|---------------|
+| 1 | Elva Yaputra | Account Recovery & Sessions | pages/{ForgotPassword,ResetPassword,Account}Page.jsx, services/authService.js | routes/auth.py, controllers/auth_controller.py |
+| 2 | Sukanya Sripanha | Catalogue | pages/{Products,ProductDetail,Home}Page.jsx, services/productService.js | routes/products.py, controllers/product_controller.py, models/product.py |
+| 3 | Yu-Jo Pan | Cart | pages/CartPage.jsx, components/CartDrawer.jsx, context/CartContext.jsx, services/cartService.js | routes/cart.py, controllers/cart_controller.py, models/cart.py |
+| 4 | Hazel Nguyen | Checkout & Orders | pages/{Checkout,Orders,OrderDetail}Page.jsx, services/orderService.js | routes/orders.py, controllers/order_controller.py, models/order.py |
+| 5 | Zephyr Huang | Admin | pages/AdminDashboard.jsx | routes/admin.py, controllers/admin_controller.py, models/activity_log.py |
 
 
 > **Auth foundation (login / register / logout / refresh / me / update profile / list sessions) is already wired** so every other slice can develop end-to-end without waiting on Person 1. Person 1's task is the four account-recovery features bolted on top.
