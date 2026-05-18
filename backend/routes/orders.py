@@ -31,7 +31,7 @@ async def my_orders(user: User = Depends(get_current_user)):
 async def place(body: PlaceOrderIn, user: User = Depends(get_current_user)):
     data = await oc.place_order(user, body.shipping.model_dump(), body.card)
     return {"success": True, "data": data, "error": None}
-
+#converting shippingin objects into a plain dictionary for controller
 
 @router.get("/{order_id}")
 async def detail(order_id: str, user: User = Depends(get_current_user)):

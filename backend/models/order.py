@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class OrderItem(BaseModel):
     product_id: str
     qty: int
-    unit_price: int  # price captured at order time
+    unit_price: int  # price captured at the time of order
 
 
 class ShippingAddress(BaseModel):
@@ -18,7 +18,7 @@ class ShippingAddress(BaseModel):
     city: str
     postal: str
     country: str
-    country_code: str | None = None
+    country_code: str | None = None #optional
     lat: float | None = None
     lng: float | None = None
 

@@ -15,6 +15,8 @@ class User(Document):
     password_salt: str
     joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reset_token_hash: Optional[str] = None                                                                                                                                                                                                                                                                                                                                                      
+    reset_token_expires_at: Optional[datetime] = None
 
     class Settings:
         name = "users"

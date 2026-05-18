@@ -46,7 +46,8 @@ def make_access_token(user: User) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.ACCESS_TTL_MIN)).timestamp()),
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+    return token.decode("utf-8") if isinstance(token, bytes) else token
 
 
 def _hash_refresh(token: str) -> str:
@@ -172,9 +173,14 @@ async def request_password_reset(email: str) -> dict:
     Always return success even if the email doesn't exist (avoid user
     enumeration), but only persist a token when the user actually exists.
     """
-    raise NotImplementedError(
-        "Person 1: implement request_password_reset (issue reset token, persist hash, return token for mock-email flow)"
-    )
+    plain = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    user = await User.find_one(User.email == email.strip().lower())
+    if user:
+        user.reset_token_hash = _hash_refresh(plain)
+        user.reset_token_expires_at = expires
+        await user.save()
+    return {"reset_token": plain, "expires_in_minutes": 60}
 
 
 async def reset_password(token: str, new_password: str) -> User:
@@ -185,9 +191,22 @@ async def reset_password(token: str, new_password: str) -> User:
     revoke all existing refresh tokens for that user (force re-login on
     every device for safety).
     """
-    raise NotImplementedError(
-        "Person 1: implement reset_password (verify token, hash new password, revoke all sessions)"
-    )
+    th = _hash_refresh(token)
+    user = await User.find_one(User.reset_token_hash == th)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+    expires_at = user.reset_token_expires_at
+    if not expires_at or (expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+    h, salt = hash_password(new_password)
+    user.password_hash = h
+    user.password_salt = salt
+    user.reset_token_hash = None
+    user.reset_token_expires_at = None
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    await RefreshToken.find(RefreshToken.user_id == user.id).update({"$set": {"revoked_at": datetime.now(timezone.utc)}})
+    return user
 
 
 async def change_password(user: User, old_password: str, new_password: str) -> User:
@@ -198,9 +217,18 @@ async def change_password(user: User, old_password: str, new_password: str) -> U
     refresh tokens (keep the current session alive — the route handler
     knows which token is current via the cookie).
     """
-    raise NotImplementedError(
-        "Person 1: implement change_password (verify old, hash new, revoke other sessions)"
-    )
+    # reject if the old password doesn't match what's stored
+    if not verify_password(user.password_hash, user.password_salt, old_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect")
+    # hash the new password and overwrite the stored credentials
+    h, salt = hash_password(new_password)
+    user.password_hash = h
+    user.password_salt = salt
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    # revoke all sessions so any attacker with a stolen cookie is forced to re-login
+    await RefreshToken.find(RefreshToken.user_id == user.id).update({"$set": {"revoked_at": datetime.now(timezone.utc)}})
+    return user
 
 
 async def revoke_session(user: User, session_id: str) -> None:
@@ -209,6 +237,14 @@ async def revoke_session(user: User, session_id: str) -> None:
     Person 1: look up `RefreshToken` by id, ensure `user_id` matches
     `user.id` (else 403/404), set `revoked_at = utcnow()`, save.
     """
-    raise NotImplementedError(
-        "Person 1: implement revoke_session (lookup by id, ensure ownership, set revoked_at)"
-    )
+    # find the session in the database by its ID
+    rt = await RefreshToken.get(session_id)
+    # if session doesn't exist or doesn't belong to this user, return 404
+    if not rt or rt.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    # if already logged out, no need to do it again
+    if rt.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session already revoked")
+    # stamp the time the session was revoked
+    rt.revoked_at = datetime.now(timezone.utc)
+    await rt.save()
